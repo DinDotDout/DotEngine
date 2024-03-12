@@ -10,8 +10,6 @@ DotWindow::DotWindow(uint32_t w, uint32_t h, std::string name)
   , _name{ name } {
     SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN);
-
     _window = SDL_CreateWindow(_name.c_str(),
                                SDL_WINDOWPOS_UNDEFINED,
                                SDL_WINDOWPOS_UNDEFINED,
@@ -22,6 +20,20 @@ DotWindow::DotWindow(uint32_t w, uint32_t h, std::string name)
 
 void DotWindow::create_surface(VkInstance instance, VkSurfaceKHR* surface) {
     SDL_Vulkan_CreateSurface(_window, instance, surface);
+}
+
+void DotWindow::handle_window_events(const SDL_Event& event) {
+    switch (event.window.event) {
+        case SDL_WINDOWEVENT_RESIZED:
+            _just_resized = true;
+            break;
+        case SDL_WINDOWEVENT_MINIMIZED:
+            _stop_rendering = true;
+            break;
+        case SDL_WINDOWEVENT_RESTORED:
+            _stop_rendering = false;
+            break;
+    }
 }
 
 DotWindow::~DotWindow() {

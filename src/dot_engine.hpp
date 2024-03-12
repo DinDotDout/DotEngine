@@ -3,38 +3,29 @@
 
 #pragma once
 
-#include "dot_swapchain.hpp"
-#include <cstdint>
-#include <memory>
+#include "dot_device.hpp"
+#include "dot_renderer.hpp"
+// #include "dot_window.hpp"
 
-#include <dot_device.hpp>
-#include <dot_window.hpp>
+class DotDevice;
+class DotWindow;
+class DotRenderer;
 
 namespace dt {
 class DotEngine {
 
   public:
-    DotEngine();
-    ~DotEngine();
-    static constexpr uint32_t initialHeight = 900;
-    static constexpr uint32_t initialWidth = 1700;
-
-    int _frameNumber{ 0 };
-    bool stop_rendering{ false };
+    DotEngine() = default;
+    ~DotEngine() = default;
+    static constexpr uint32_t INITIAL_HEIGHT = 900;
+    static constexpr uint32_t INITIAL_WIDTH = 1700;
 
     static DotEngine& Get();
-
-    // run main loop
     void run();
 
   private:
-    std::unique_ptr<DotWindow> _dotWindow;
-    std::unique_ptr<DotDevice> _dotDevice;
-    std::unique_ptr<DotSwapchain> _dotSwapchain;
-    // draw loop
-    void draw();
-    void init_swapchain();
-    void init_commands();
-    void init_sync_structures();
+    DotWindow _dotWindow{ INITIAL_WIDTH, INITIAL_HEIGHT, "Dot Engine" };
+    DotDevice _dotDevice{ _dotWindow };
+    DotRenderer _dotRenderer{ _dotWindow, _dotDevice };
 };
 }
