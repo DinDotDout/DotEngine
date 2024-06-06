@@ -3,17 +3,16 @@
 
 #pragma once
 
-#include "dot_device.hpp"
-#include "dot_renderer.hpp"
-// #include "dot_window.hpp"
+// #include "dot_device.hpp"
+#include "dot_window.hpp"
+#include "vk_renderer/core/dot_renderer.hpp"
+#include <vulkan/vulkan_core.h>
 
-class DotDevice;
 class DotWindow;
 class DotRenderer;
 
 namespace dt {
 class DotEngine {
-
   public:
     DotEngine() = default;
     ~DotEngine() = default;
@@ -25,7 +24,8 @@ class DotEngine {
 
   private:
     DotWindow _dotWindow{ INITIAL_WIDTH, INITIAL_HEIGHT, "Dot Engine" };
-    DotDevice _dotDevice{ _dotWindow };
-    DotRenderer _dotRenderer{ _dotWindow, _dotDevice };
+    // DotDevice _dotDevice{ _dotWindow };
+    // DotRenderer _dotRenderer{ _dotWindow, _dotDevice };
+    DotRenderer _dotRenderer{ _dotWindow };
 };
-}
+} // namespace dt

@@ -1,7 +1,8 @@
 #include "dot_window.hpp"
 
 #include "SDL.h"
-#include <SDL_vulkan.h>
+#include "dot_engine.hpp"
+// #include <SDL_vulkan.h>
 
 namespace dt {
 
@@ -18,20 +19,25 @@ DotWindow::DotWindow(uint32_t w, uint32_t h, std::string name)
                                window_flags);
 }
 
-void DotWindow::create_surface(VkInstance instance, VkSurfaceKHR* surface) {
-    SDL_Vulkan_CreateSurface(_window, instance, surface);
+
+void DotWindow::update_extent() {
+    int w, h;
+    SDL_GetWindowSize(_window, &w, &h);
+    _windowExtent.width = w;
+    _windowExtent.height = h;
+    _window_resized = true;
 }
 
 void DotWindow::handle_window_events(const SDL_Event& event) {
     switch (event.window.event) {
         case SDL_WINDOWEVENT_RESIZED:
-            _just_resized = true;
+            update_extent();
             break;
         case SDL_WINDOWEVENT_MINIMIZED:
-            _stop_rendering = true;
+            _minimized = true;
             break;
         case SDL_WINDOWEVENT_RESTORED:
-            _stop_rendering = false;
+            _minimized = false;
             break;
     }
 }
@@ -39,4 +45,4 @@ void DotWindow::handle_window_events(const SDL_Event& event) {
 DotWindow::~DotWindow() {
     SDL_DestroyWindow(_window);
 }
-}
+} // namespace dt

@@ -1,17 +1,16 @@
-﻿//> includes
-#include "dot_engine.hpp"
-
+﻿#include "dot_engine.hpp"
 #include <SDL.h>
 #include <thread>
 
 namespace dt {
-
 void DotEngine::run() {
     SDL_Event e;
-    while (true) {
+    bool bQuit = false;
+    bool resize_= false;
+    while (!bQuit) {
         while (SDL_PollEvent(&e) != 0) {
             if (e.type == SDL_QUIT) {
-                vkDeviceWaitIdle(_dotDevice.get_device());
+                _dotRenderer.wait_device_idle();
                 return;
             }
             if (e.type == SDL_WINDOWEVENT) {
@@ -19,16 +18,16 @@ void DotEngine::run() {
             }
         }
 
-        if (_dotWindow.should_stop_rendering()) {
+        if (_dotWindow.is_minimized()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
+
         if (_dotWindow.is_resize_requested()) {
             _dotRenderer.resize_swapchain();
-            _dotWindow.reset_resize_request();
+            _dotWindow.reset_resized();
         }
         _dotRenderer.render_pass();
     }
 }
-
-}
+}  // namespace dt
