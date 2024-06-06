@@ -1,10 +1,5 @@
-﻿# CMakeList.txt : CMake project for vulkan_guide, include source and define
-# project specific logic here.
-#
-
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG") # Add debug flag
-                                                              # to
-                                                              # CXX_FLAGS_DEBUG
+﻿# Add debug flag to CXX_FLAGS_DEBUG
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 
 cmake_minimum_required(VERSION 3.8)
 
