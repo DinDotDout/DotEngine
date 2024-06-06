@@ -1,5 +1,6 @@
 ﻿# Add debug flag to CXX_FLAGS_DEBUG
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
+# add_definitions(-DSOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 cmake_minimum_required(VERSION 3.8)
 
@@ -26,13 +27,15 @@ file(GLOB_RECURSE GLSL_SOURCE_FILES "${PROJECT_SOURCE_DIR}/shaders/*.frag"
 foreach(GLSL ${GLSL_SOURCE_FILES})
   message(STATUS "BUILDING SHADER")
   get_filename_component(FILE_NAME ${GLSL} NAME)
-  set(SPIRV "${PROJECT_SOURCE_DIR}/shaders/${FILE_NAME}.spv")
-  message(STATUS ${GLSL})
+  set(SPIRV "${PROJECT_SOURCE_DIR}/built_shaders/${FILE_NAME}.spv")
+  message(STATUS "Output path: ${SPIRV}")
   add_custom_command(
     OUTPUT ${SPIRV}
     COMMAND ${GLSL_VALIDATOR} -V ${GLSL} -o ${SPIRV}
-    DEPENDS ${GLSL})
+    DEPENDS ${GLSL}
+    VERBATIM
+    COMMENT "Compiling ${GLSL} to SPIR-V")
   list(APPEND SPIRV_BINARY_FILES ${SPIRV})
 endforeach(GLSL)
 
-add_custom_target(Shaders DEPENDS ${SPIRV_BINARY_FILES})
+add_custom_target(Shaders ALL DEPENDS ${SPIRV_BINARY_FILES})
