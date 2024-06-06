@@ -2,6 +2,7 @@
 
 #include "./dot_window.hpp"
 #include "vk_renderer/core/dot_device.hpp"
+#include "vk_renderer/core/dot_pipeline.hpp"
 #include "vk_renderer/core/dot_swapchain.hpp"
 #include "memory"
 
@@ -26,7 +27,6 @@ class DotRenderer {
     void resize_swapchain();
     void wait_device_idle();
 
-    // VkSwapchainKHR get_swapchain() const { return _dotSwapchain.get_swapchain(); }
   private:
     DotWindow& _dotWindow;
 #ifdef NDEBUG
@@ -40,6 +40,7 @@ class DotRenderer {
 
     std::unique_ptr<DotDevice> _dotDevice;
     std::unique_ptr<DotSwapchain> _dotSwapchain;
+    std::unique_ptr<DotPipeline> _dotPipeline;
     DeletionQueue _deletionQueue{};
 
     VmaAllocator _allocator;
@@ -54,6 +55,7 @@ class DotRenderer {
     void _init_device(vkb::Instance vkb_inst);
     void _init_swapchain();
     void _init_allocator();
+    void _init_pipeline();
     void _create_draw_image_and_view();
 
     // void draw(VkCommandBuffer cmd, VkImage* im);

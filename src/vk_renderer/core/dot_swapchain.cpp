@@ -3,7 +3,6 @@
 #include "vk_renderer/utils/dot_initializers.hpp"
 
 #include <VkBootstrap.h>
-#include <iostream>
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 
@@ -27,7 +26,7 @@ DotSwapchain::~DotSwapchain() {
     // NOTE: Refactor with RAII
     destroy_swapchain();
     for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
-        // frames[i].resourceManager.flush();
+        _frames[i].deletionQueue.flush();
         vkDestroyCommandPool(_dotDevice.get_device(), _frames[i].commandPool, nullptr);
         vkDestroyFence(_dotDevice.get_device(), _frames[i].renderFence, nullptr);
         vkDestroySemaphore(_dotDevice.get_device(), _frames[i].renderSemaphore, nullptr);
@@ -125,7 +124,7 @@ void DotSwapchain::destroy_swapchain() {
     }
 }
 
-bool DotSwapchain::acquire_next_image(VkImage** image) {
+bool DotSwapchain::acquire_next_image(VkImage* image) {
     auto frameData = get_current_frame_data();
     // std::numeric_limits<uint64_t>::max()
     VK_CHECK(vkWaitForFences(_dotDevice.get_device(), 1, &frameData.renderFence, true, 1000000000));
@@ -145,7 +144,7 @@ bool DotSwapchain::acquire_next_image(VkImage** image) {
         throw std::runtime_error("Failed to acquire next swapchain image!");
         return false;
     }
-    *image = &_swapchainImages[_swapchainImageIndex];
+    *image = _swapchainImages[_swapchainImageIndex];
     return true;
 }
 

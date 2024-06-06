@@ -2,7 +2,6 @@
 
 #include <vector>
 #include <vulkan/vulkan_core.h>
-
 #include "dot_window.hpp"
 #include "vk_renderer/utils/deletion_queue.hpp"
 #include "vk_renderer/core/dot_device.hpp"
@@ -30,7 +29,7 @@ class DotSwapchain {
     DotSwapchain& operator=(const DotSwapchain&) = delete;
 
     VkSwapchainKHR get_swapchain() const { return _swapchain; }
-    VkImage* get_image() { return &_swapchainImages[_swapchainImageIndex]; }
+    // VkImage* get_image() { return &_swapchainImages[_swapchainImageIndex]; }
     const VkExtent2D& get_swapchain_extent() { return _swapchainExtent; }
 
     uint32_t get_current_frame() const { return _frameNumber; }
@@ -38,7 +37,7 @@ class DotSwapchain {
     void next_frame() { _frameNumber++; }
 
     void resize_swapchain(VkExtent2D newExtent);
-    bool acquire_next_image(VkImage** imageIndex); // NOTE: May need to revisit this.
+    bool acquire_next_image(VkImage* imageIndex); // NOTE: May need to revisit this.
     bool swapchain_present_image(VkQueue queue);
 
     void submit_command_buffer(VkCommandBuffer* cmd);

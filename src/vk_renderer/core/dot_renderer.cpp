@@ -2,6 +2,7 @@
 #include "SDL_vulkan.h"
 #include "vk_renderer/utils/dot_images.hpp"
 #include "vk_renderer/utils/dot_initializers.hpp"
+// #include <iostream>
 #include <iostream>
 #include <vulkan/vulkan_core.h>
 namespace dt {
@@ -21,6 +22,7 @@ void DotRenderer::_init_vulkan() {
     _init_swapchain();
     _init_allocator();
     _create_draw_image_and_view();
+    _init_pipeline();
 }
 
 vkb::Instance DotRenderer::_create_instance() {
@@ -79,7 +81,7 @@ void DotRenderer::_create_draw_image_and_view() {
 
     VkExtent2D windowExtent = _dotWindow.get_window_extent();
     VkExtent3D drawImageExtent = { _dotWindow.get_window_extent().width,
-                                   _dotWindow.get_window_extent().width,
+                                   _dotWindow.get_window_extent().height,
                                    1 };
 
     // hardcoding the draw format to 32 bit float
@@ -95,16 +97,13 @@ void DotRenderer::_create_draw_image_and_view() {
     VkImageCreateInfo rimg_info =
       vkinit::image_create_info(_drawImage.imageFormat, drawImageUsages, drawImageExtent);
 
-    // for the draw image, we want to allocate it from gpu local memory
     VmaAllocationCreateInfo rimg_allocinfo = {};
     rimg_allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     rimg_allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    // allocate and create the image
     vmaCreateImage(
       _allocator, &rimg_info, &rimg_allocinfo, &_drawImage.image, &_drawImage.allocation, nullptr);
 
-    // build a image-view for the draw image to use for rendering
     VkImageViewCreateInfo rview_info = vkinit::imageview_create_info(
       _drawImage.imageFormat, _drawImage.image, VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -117,49 +116,52 @@ void DotRenderer::_create_draw_image_and_view() {
     });
 }
 
-void DotRenderer::render_pass() {
-    auto device = _dotDevice->get_device();
+void DotRenderer::_init_pipeline() {
+    _dotPipeline = std::make_unique<DotPipeline>(*_dotDevice, _drawImage.imageView);
+    _deletionQueue.push_function([=, this]() { _dotPipeline.reset(); });
+}
 
-    // uint32_t swapchainImageIndex;
-    VkImage* swapchainImage;
+void DotRenderer::render_pass() {
+    VkImage swapchainImage;
     bool success = _dotSwapchain->acquire_next_image(&swapchainImage);
-    if (!success) { // Resizing or error
-        std::cout << "requested in rend in\n";
+    if (!success) {
         return;
     }
 
     auto frameData = _dotSwapchain->get_current_frame_data();
+    frameData.deletionQueue.flush();
     VkCommandBuffer cmd = frameData.mainCommandBuffer;
     _begin_command_buffer(&cmd);
+
     /* Record command buffer */ {
         // Prepare image for rendering
         vkutil::transition_image(
           cmd, _drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        _drawExtent.width = _drawImage.imageExtent.width;
+        _drawExtent.height = _drawImage.imageExtent.height;
+
         draw(cmd);
         vkutil::transition_image(
           cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
         vkutil::transition_image(
-          cmd, *swapchainImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-        _drawExtent.width = _drawImage.imageExtent.width;
-        _drawExtent.height = _drawImage.imageExtent.height;
+          cmd, swapchainImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         vkutil::copy_image_to_image(cmd,
                                     _drawImage.image,
-                                    *swapchainImage,
+                                    swapchainImage,
                                     _drawExtent,
                                     _dotSwapchain->get_swapchain_extent());
 
         // Prepare for presentation
         vkutil::transition_image(cmd,
-                                 *swapchainImage,
+                                 swapchainImage,
                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                  VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
     }
     _end_command_buffer(&cmd);
     _dotSwapchain->submit_command_buffer(&cmd);
     if (!_dotSwapchain->swapchain_present_image(_dotDevice->get_graphics_queue())) {
-            // std::cout << "requested in ren end \n";
+        // std::cout << "requested in ren end \n";
     }
     _dotSwapchain->next_frame();
 }
@@ -175,15 +177,20 @@ void DotRenderer::_begin_command_buffer(VkCommandBuffer* cmd) {
       vkinit::command_buffer_begin_info(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
     VK_CHECK(vkBeginCommandBuffer(*cmd, &cmdBeginInfo));
 }
-
+bool patata = false;
 void DotRenderer::draw(VkCommandBuffer cmd) {
     VkClearColorValue clearValue;
     float flash = abs(sin(_dotSwapchain->get_current_frame() / 120.f));
     clearValue = { { 0.0f, 0.0f, flash, 1.0f } };
     VkImageSubresourceRange clearRange = vkinit::image_subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
-    // vkCmdClearColorImage(cmd, *im, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
-    vkCmdClearColorImage(
-      cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+    // vkCmdClearColorImage(
+    //   cmd, _drawImage.image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, _dotPipeline->get_gradient_pipeline());
+    _dotPipeline->bind_descriptor_set(cmd);
+    int32_t width_group_size = std::ceil(_drawImage.imageExtent.width / 16.0);
+    uint32_t height_group_size = std::ceil(_drawImage.imageExtent.height / 16.0);
+    vkCmdDispatch(cmd, width_group_size, height_group_size, 1);
 }
 
 void DotRenderer::resize_swapchain() {
