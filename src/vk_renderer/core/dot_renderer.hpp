@@ -1,20 +1,18 @@
 #pragma once
 
 #include "./dot_window.hpp"
+#include "memory"
 #include "vk_renderer/core/dot_device.hpp"
+#include "vk_renderer/core/dot_imgui.hpp"
 #include "vk_renderer/core/dot_pipeline.hpp"
 #include "vk_renderer/core/dot_swapchain.hpp"
-#include "memory"
+#include "vk_renderer/vk_types.hpp" // Vma allocator needed
+#include "vk_renderer/utils/dot_images.hpp"
+#include <iostream>
 
 namespace dt {
 class DotRenderer {
-    struct AllocatedImage {
-        VkImage image;
-        VkImageView imageView;
-        VmaAllocation allocation;
-        VkExtent3D imageExtent;
-        VkFormat imageFormat;
-    };
+    // NOTE: Should layout be included?
 
   public:
     explicit DotRenderer(DotWindow& dotWindow);
@@ -26,6 +24,12 @@ class DotRenderer {
     void render_pass();
     void resize_swapchain();
     void wait_device_idle();
+    // DotPipeline::ComputeEffect get_effects();
+    const std::vector<DotPipeline::ComputeEffect>& get_background_effects();
+    int get_current_background_effect();
+    void set_current_background_effect(int backgroundEffect) {
+        _dotPipeline->set_current_background_effect(backgroundEffect);
+    }
 
   private:
     DotWindow& _dotWindow;
@@ -41,13 +45,15 @@ class DotRenderer {
     std::unique_ptr<DotDevice> _dotDevice;
     std::unique_ptr<DotSwapchain> _dotSwapchain;
     std::unique_ptr<DotPipeline> _dotPipeline;
+    std::unique_ptr<DotImGui> _dotImGui;
+
     DeletionQueue _deletionQueue{};
 
     VmaAllocator _allocator;
-    AllocatedImage _drawImage;
+    vkutil::AllocatedImage _drawImage;
     VkExtent2D _drawExtent;
 
-    AllocatedImage _depthImage;
+    vkutil::AllocatedImage _depthImage;
 
     void _init_vulkan();
     vkb::Instance _create_instance();
@@ -56,10 +62,13 @@ class DotRenderer {
     void _init_swapchain();
     void _init_allocator();
     void _init_pipeline();
+    void _init_imgui();
     void _create_draw_image_and_view();
 
     // void draw(VkCommandBuffer cmd, VkImage* im);
-    void draw(VkCommandBuffer cmd);
+    void draw_background(VkCommandBuffer cmd);
+    void draw_imgui(VkCommandBuffer cmd, VkImageView targetImageView);
+    void draw_geometry(VkCommandBuffer cmd);
     void _end_command_buffer(VkCommandBuffer* cmd);
     void _begin_command_buffer(VkCommandBuffer* cmd);
 };

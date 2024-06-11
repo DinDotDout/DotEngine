@@ -36,6 +36,7 @@ target_precompile_headers(
   <glm/vec4.hpp>
   <vulkan/vulkan.h>)
 
+# Copy the dlls to the build directory not needed as they are in my system path
 # add_custom_command(
 #   TARGET engine
 #   POST_BUILD

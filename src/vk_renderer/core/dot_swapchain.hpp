@@ -5,7 +5,6 @@
 #include "dot_window.hpp"
 #include "vk_renderer/utils/deletion_queue.hpp"
 #include "vk_renderer/core/dot_device.hpp"
-#include "vk_renderer/vk_types.hpp" // Vma allocator needed
 
 namespace dt {
 
@@ -30,17 +29,18 @@ class DotSwapchain {
 
     VkSwapchainKHR get_swapchain() const { return _swapchain; }
     // VkImage* get_image() { return &_swapchainImages[_swapchainImageIndex]; }
-    const VkExtent2D& get_swapchain_extent() { return _swapchainExtent; }
+    VkExtent2D get_swapchain_extent() { return _swapchainExtent; }
+    VkFormat get_swapchain_image_format() { return _swapchainImageFormat; }
 
     uint32_t get_current_frame() const { return _frameNumber; }
     FrameData& get_current_frame_data() { return _frames[_frameNumber % FRAMES_IN_FLIGHT]; }
     void next_frame() { _frameNumber++; }
 
     void resize_swapchain(VkExtent2D newExtent);
-    bool acquire_next_image(VkImage* imageIndex); // NOTE: May need to revisit this.
+    bool acquire_next_image(VkImage* image, VkImageView* imageView); // NOTE: May need to revisit this.
     bool swapchain_present_image(VkQueue queue);
-
     void submit_command_buffer(VkCommandBuffer* cmd);
+    void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
 
   private:
     static constexpr unsigned int FRAMES_IN_FLIGHT = 2;
@@ -52,6 +52,10 @@ class DotSwapchain {
     VkSwapchainKHR _swapchain;
     VkFormat _swapchainImageFormat;
 
+    VkFence _immediateFence;
+    VkCommandPool _immediateCommandPool;
+    VkCommandBuffer _immediateCommandBuffer;
+
     std::vector<VkImage> _swapchainImages;
     std::vector<VkImageView> _swapchainImageViews;
 
@@ -59,13 +63,14 @@ class DotSwapchain {
     const DotDevice& _dotDevice;
     const DotWindow& _dotWindow;
 
+    DeletionQueue _deletionQueue{};
     void create_swapchain(VkExtent2D newExtent);
     void destroy_swapchain();
 
     // NOTE: Keep separate from command buffers in case of future changes
-    void create_command_pools();
-    void allocate_command_buffers();
-
-    void create_sync_structures();
+    void create_frame_command_pools();
+    void allocate_frame_command_buffers();
+    void create_frame_sync_structures();
+    void create_immediate_submit_structures();
 };
 } // namespace dt
