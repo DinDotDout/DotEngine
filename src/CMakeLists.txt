@@ -1,5 +1,5 @@
 # source to this project's executable.
-file(GLOB_RECURSE SOURCES "*.cpp") # Traverse subdirectories from here
+file(GLOB_RECURSE SOURCES "*.cpp") # Traverse subdirectories
 
 add_executable(engine ${SOURCES})
 # add_executable( engine main.cpp vk_types.h vk_initializers.cpp
@@ -11,6 +11,10 @@ set_property(TARGET engine PROPERTY CXX_STANDARD 20)
 target_compile_definitions(engine PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 target_include_directories(engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
+# Ensure the required package is found
+
+# Then link the libraries
+# add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/fastgltf)
 target_link_libraries(
   engine
   PUBLIC vma
@@ -20,8 +24,8 @@ target_link_libraries(
          stb_image
          SDL2::SDL2
          vkbootstrap
-         imgui)
-         # fastgltf::fastgltf)
+         imgui
+         fastgltf::fastgltf)
 
 target_precompile_headers(
   engine
@@ -36,10 +40,5 @@ target_precompile_headers(
   <glm/vec4.hpp>
   <vulkan/vulkan.h>)
 
-# Copy the dlls to the build directory not needed as they are in my system path
-# add_custom_command(
-#   TARGET engine
-#   POST_BUILD
-#   COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:engine>
-#           $<TARGET_FILE_DIR:engine>
-#   COMMAND_EXPAND_LISTS)
+# add_custom_command( TARGET engine POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy
+# $<TARGET_RUNTIME_DLLS:engine> $<TARGET_FILE_DIR:engine> COMMAND_EXPAND_LISTS)

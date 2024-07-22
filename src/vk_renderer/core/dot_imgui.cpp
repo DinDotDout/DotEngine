@@ -2,16 +2,13 @@
 #include "dot_imgui.hpp"
 
 #include "imgui.h"
-// #include "imgui_impl_sdl.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_vulkan.h"
 
-#include "dot_window.hpp"
-#include "vk_renderer/utils/dot_initializers.hpp"
+#include "dot_device.hpp"
 #include "vk_renderer/vk_types.hpp" // Vma allocator needed
 
 namespace dt {
-using vkinit::rendering_info;
 
 DotImGui::DotImGui(const DotDevice& dotDevice,
                    SDL_Window* window,

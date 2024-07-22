@@ -1,5 +1,9 @@
 #include "vk_renderer/core/dot_device.hpp"
+#include "vk_renderer/vk_types.hpp"
+#include <cassert>
+#include <iostream>
 namespace dt {
+using std::cout;
 
 DotDevice::DotDevice(vkb::Instance& instance, VkSurfaceKHR& surface) {
     _init_device(instance, surface);
@@ -19,12 +23,17 @@ void DotDevice::_init_device(vkb::Instance& instance, VkSurfaceKHR& surface) {
     features12.descriptorIndexing = true;
 
     vkb::PhysicalDeviceSelector selector{ instance };
-    vkb::PhysicalDevice vkbPhysicalDevice = selector.set_minimum_version(1, 3)
-                                              .set_required_features_13(features)
-                                              .set_required_features_12(features12)
-                                              .set_surface(surface)
-                                              .select()
-                                              .value();
+    vkb::Result<vkb::PhysicalDevice> result = selector.set_minimum_version(1, 3)
+                                                .set_required_features_13(features)
+                                                .set_required_features_12(features12)
+                                                .set_surface(surface)
+                                                .select();
+    if (!result) {
+        std::cout << "Error message: " << result.error().message() << std::endl;
+        return;
+    }
+
+    vkb::PhysicalDevice vkbPhysicalDevice = result.value();
     _physicalDevice = vkbPhysicalDevice.physical_device;
 
     vkb::DeviceBuilder deviceBuilder{ vkbPhysicalDevice };

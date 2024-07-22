@@ -2,11 +2,14 @@
 
 #include <vector>
 #include <vulkan/vulkan_core.h>
-#include "dot_window.hpp"
+// #include "vk_renderer/core/dot_device.hpp"
+// #include "dot_window.hpp"
+#include "vk_renderer/core/dot_descriptors.hpp"
 #include "vk_renderer/utils/deletion_queue.hpp"
-#include "vk_renderer/core/dot_device.hpp"
 
 namespace dt {
+class DotDevice;
+class DotWindow;
 
 class DotSwapchain {
     struct FrameData {
@@ -16,6 +19,7 @@ class DotSwapchain {
         VkSemaphore swapchainSemaphore, renderSemaphore;
         VkFence renderFence;
         DeletionQueue deletionQueue{};
+        DescriptorAllocatorGrowable frameDescriptors{};
     };
 
   public:
@@ -28,24 +32,26 @@ class DotSwapchain {
     DotSwapchain& operator=(const DotSwapchain&) = delete;
 
     VkSwapchainKHR get_swapchain() const { return _swapchain; }
-    // VkImage* get_image() { return &_swapchainImages[_swapchainImageIndex]; }
     VkExtent2D get_swapchain_extent() { return _swapchainExtent; }
     VkFormat get_swapchain_image_format() { return _swapchainImageFormat; }
 
-    uint32_t get_current_frame() const { return _frameNumber; }
-    FrameData& get_current_frame_data() { return _frames[_frameNumber % FRAMES_IN_FLIGHT]; }
-    void next_frame() { _frameNumber++; }
+    uint32_t get_current_frame() const { return _frame % FRAMES_IN_FLIGHT; }
+    // uint32_t get_current_frame() const { return _frame; }
+    FrameData& get_current_frame_data() { return _frames[_frame % FRAMES_IN_FLIGHT]; }
+    // void next_frame() { _frame++; }
 
     void resize_swapchain(VkExtent2D newExtent);
-    bool acquire_next_image(VkImage* image, VkImageView* imageView); // NOTE: May need to revisit this.
+    bool acquire_next_image(VkImage* image,
+                            VkImageView* imageView); // NOTE: May need to revisit this.
     bool swapchain_present_image(VkQueue queue);
-    void submit_command_buffer(VkCommandBuffer* cmd);
+    void submit_command_buffer(VkCommandBuffer cmd);
     void immediate_submit(std::function<void(VkCommandBuffer cmd)>&& function);
+    void clear_frames();
 
   private:
     static constexpr unsigned int FRAMES_IN_FLIGHT = 2;
     FrameData _frames[FRAMES_IN_FLIGHT];
-    uint32_t _frameNumber = 0;
+    uint32_t _frame = 0;
     uint32_t _swapchainImageIndex;
 
     VkExtent2D _swapchainExtent;
@@ -70,6 +76,7 @@ class DotSwapchain {
     // NOTE: Keep separate from command buffers in case of future changes
     void create_frame_command_pools();
     void allocate_frame_command_buffers();
+    void init_descriptor_pools();
     void create_frame_sync_structures();
     void create_immediate_submit_structures();
 };

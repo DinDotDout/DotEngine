@@ -2,6 +2,7 @@
 #include <deque>
 
 #include <functional>
+#include <vk_renderer/vk_types.hpp>
 namespace dt {
 class DeletionQueue {
   public:
@@ -11,7 +12,6 @@ class DeletionQueue {
         for (auto it = _deletors.rbegin(); it != _deletors.rend(); it++) {
             (*it)();
         }
-
         _deletors.clear();
     }
 };

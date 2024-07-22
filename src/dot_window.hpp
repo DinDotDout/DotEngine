@@ -25,7 +25,6 @@ class DotWindow {
 
     const SDL_WindowFlags window_flags =
       (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-      // (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
     std::string _name;
     VkExtent2D _windowExtent{ 1700, 900 };

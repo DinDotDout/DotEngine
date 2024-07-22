@@ -1,304 +1,115 @@
 #include "dot_pipeline.hpp"
 #include "vk_renderer/utils/dot_initializers.hpp"
 #include "vk_renderer/vk_types.hpp"
+#include <iostream>
+#include <vulkan/vulkan_core.h>
 namespace dt {
-DotPipeline::DotPipeline(const DotDevice& device, const vkutil::AllocatedImage& allocImage)
-  : _device{ device }
-  , _allocImage{ allocImage } {
-    _init_descriptors();
-    _init_pipelines();
+DotPipeline::DotPipeline(std::variant<GraphicsPipelineConfig, ComputePipelineConfig> pipelineData,
+                         const DotDevice& device)
+  : _pipelineData(pipelineData)
+  , _device{ device } {
+    if (std::holds_alternative<GraphicsPipelineConfig>(_pipelineData)) {
+        auto& graphicsData = std::get<GraphicsPipelineConfig>(_pipelineData);
+        _init_graphics_pipeline(graphicsData);
+
+        // Do something with graphicsData...
+    } else if (std::holds_alternative<ComputePipelineConfig>(_pipelineData)) {
+        auto& computeData = std::get<ComputePipelineConfig>(_pipelineData);
+        _init_compute_pipeline(computeData);
+        // Do something with computeData...
+    }
 }
 
 DotPipeline::~DotPipeline() {
-    vkDestroyDescriptorSetLayout(_device.get_device(), _drawImageDescriptorLayout, nullptr);
-    globalDescriptorAllocator.clear_descriptors(_device.get_device());
-    globalDescriptorAllocator.destroy_pool(_device.get_device());
-    vkDestroyPipelineLayout(_device.get_device(), _gradientPipelineLayout, nullptr);
-    for (ComputeEffect& effect : backgroundEffects) {
-        vkDestroyPipeline(_device.get_device(), effect.pipeline, nullptr);
-    }
-    vkDestroyPipelineLayout(_device.get_device(), _trianglePipelineLayout, nullptr);
-    vkDestroyPipeline(_device.get_device(), _trianglePipeline, nullptr);
+    std::cout << "Destroying pipeline" << std::endl;
+    vkDestroyPipelineLayout(_device.get_device(), _pipelineLayout, nullptr);
+    std::cout << "Destroying pileineLayout" << std::endl;
+    vkDestroyPipeline(_device.get_device(), _pipeline, nullptr);
 }
 
-void DotPipeline::_init_descriptors() {
-    // create a descriptor pool that will hold 10 sets with 1 image each
-    std::vector<DescriptorAllocator::PoolSizeRatio> sizes = { { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                                                                1 } };
-
+void DotPipeline::_init_compute_pipeline(ComputePipelineConfig pipelineData) {
     VkDevice device = _device.get_device();
-    globalDescriptorAllocator.init_pool(device, 10, sizes);
-
-    // make the descriptor set layout for our compute draw
-    {
-        DescriptorLayoutBuilder builder;
-        builder.add_binding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-        _drawImageDescriptorLayout = builder.build(device, VK_SHADER_STAGE_COMPUTE_BIT);
+    VkPipelineLayoutCreateInfo computeLayout = vkinit::pipeline_layout_create_info();
+    computeLayout.pSetLayouts = &pipelineData.descriptorSetLayout;
+    computeLayout.setLayoutCount = 1; // Should be set according to the number of sets
+    if (pipelineData.pushConstantRange) {
+        computeLayout.pPushConstantRanges = pipelineData.pushConstantRange;
+        computeLayout.pushConstantRangeCount = 1;
     }
 
-    _drawImageDescriptors = globalDescriptorAllocator.allocate(device, _drawImageDescriptorLayout);
+    VK_CHECK(vkCreatePipelineLayout(device, &computeLayout, nullptr, &_pipelineLayout));
 
-    VkDescriptorImageInfo imgInfo{};
-    imgInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imgInfo.imageView = _allocImage.imageView;
-
-    VkWriteDescriptorSet drawImageWrite = {};
-    drawImageWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    drawImageWrite.pNext = nullptr;
-
-    drawImageWrite.dstBinding = 0;
-    drawImageWrite.dstSet = _drawImageDescriptors;
-    drawImageWrite.descriptorCount = 1;
-    drawImageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    drawImageWrite.pImageInfo = &imgInfo;
-
-    vkUpdateDescriptorSets(device, 1, &drawImageWrite, 0, nullptr);
-}
-
-void DotPipeline::_init_background_pipelines() {
-    VkDevice device = _device.get_device();
-    // Layout
-    // VkPipelineLayoutCreateInfo computeLayout = vkinit::pipeline_layout_create_info();
-    // computeLayout.pSetLayouts = &_drawImageDescriptorLayout;
-    // Same as prev line
-    VkPushConstantRange pushConstant{};
-    pushConstant.offset = 0;
-    pushConstant.size = sizeof(ComputePushConstants);
-    pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-    VkPipelineLayoutCreateInfo computeLayout{};
-    computeLayout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    computeLayout.pNext = nullptr;
-    computeLayout.pSetLayouts = &_drawImageDescriptorLayout;
-    computeLayout.setLayoutCount = 1;
-
-    computeLayout.pPushConstantRanges = &pushConstant;
-    computeLayout.pushConstantRangeCount = 1;
-
-    VK_CHECK(vkCreatePipelineLayout(device, &computeLayout, nullptr, &_gradientPipelineLayout));
-
-    // Object creation
-    VkShaderModule gradientShader;
-    if (!vkinit::load_shader_module(
-          "built_shaders/gradient_color.comp.spv", device, &gradientShader)) {
-        fmt::print("Error when building the compute shader \n");
+    VkShaderModule computeShader;
+    if (!vkinit::load_shader_module(pipelineData.computeShaderFile, device, &computeShader)) {
+        PRINT_D("Error when building the compute shader %s: ", pipelineData.computeShaderFile);
+        // fmt::println("Error when building the compute shader");
+    } else {
+        PRINT_D("Compute shader successfully loaded %s: ", pipelineData.computeShaderFile);
+        // fmt::println("Compute shader successfully loaded");
     }
 
-    VkShaderModule skyShader;
-    if (!vkinit::load_shader_module("built_shaders/sky.comp.spv", device, &skyShader)) {
-        fmt::print("Error when building the compute shader \n");
-    }
-
-    VkPipelineShaderStageCreateInfo stageinfo{};
-    stageinfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stageinfo.pNext = nullptr;
-    stageinfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    stageinfo.module = gradientShader;
-    stageinfo.pName = "main";
-
+    VkPipelineShaderStageCreateInfo stageinfo =
+      vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_COMPUTE_BIT, computeShader);
     VkComputePipelineCreateInfo computePipelineCreateInfo{};
     computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     computePipelineCreateInfo.pNext = nullptr;
-    computePipelineCreateInfo.layout = _gradientPipelineLayout;
+    computePipelineCreateInfo.layout = _pipelineLayout;
     computePipelineCreateInfo.stage = stageinfo;
-
-    ComputeEffect gradient;
-    gradient.layout = _gradientPipelineLayout;
-    gradient.name = "gradient";
-    gradient.data = {};
-    // default colors
-    gradient.data.data1 = glm::vec4(1, 0, 0, 1);
-    gradient.data.data2 = glm::vec4(0, 0, 1, 1);
-
+    PRINT_D("Creating compute pipeline");
     VK_CHECK(vkCreateComputePipelines(
-      device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &gradient.pipeline));
-
-    computePipelineCreateInfo.stage.module = skyShader;
-
-    ComputeEffect sky;
-    sky.layout = _gradientPipelineLayout;
-    sky.name = "sky";
-    sky.data = {};
-    // default sky parameters
-    sky.data.data1 = glm::vec4(0.1, 0.2, 0.4, 0.97);
-
-    VK_CHECK(vkCreateComputePipelines(
-      device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &sky.pipeline));
-
-    // add the 2 background effects into the array
-    backgroundEffects.push_back(gradient);
-    backgroundEffects.push_back(sky);
-    vkDestroyShaderModule(device, gradientShader, nullptr);
-    vkDestroyShaderModule(device, skyShader, nullptr);
+      device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &_pipeline));
+    vkDestroyShaderModule(device, computeShader, nullptr);
 }
 
-void DotPipeline::_init_pipelines() {
-    _init_background_pipelines();
-    _init_triangle_pipeline();
-}
-
-void DotPipeline::_init_triangle_pipeline() {
+void DotPipeline::_init_graphics_pipeline(GraphicsPipelineConfig pipelineData) {
     VkDevice device = _device.get_device();
-    VkShaderModule triangleFragShader;
-    if (!vkinit::load_shader_module(
-          "built_shaders/colored_triangle.frag.spv", device, &triangleFragShader)) {
-        fmt::print("Error when building the triangle fragment shader module");
+    VkShaderModule vertexShader;
+    if (!vkinit::load_shader_module(pipelineData.vertexShaderFile, device, &vertexShader)) {
+        PRINT_D("Error when building the fragment shader %s: ", pipelineData.vertexShaderFile);
     } else {
-        fmt::print("Triangle fragment shader succesfully loaded");
+        PRINT_D("Vertex shader successfully loaded %s: ", pipelineData.vertexShaderFile);
     }
 
-    VkShaderModule triangleVertexShader;
-    if (!vkinit::load_shader_module(
-          "built_shaders/colored_triangle.vert.spv", device, &triangleVertexShader)) {
-        fmt::print("Error when building the triangle vertex shader module");
+    VkShaderModule fragShader;
+    if (!vkinit::load_shader_module(pipelineData.fragmentShaderFile, device, &fragShader)) {
+        PRINT_D("Error when building the fragment shader %s: ", pipelineData.fragmentShaderFile);
     } else {
-        fmt::print("Triangle vertex shader succesfully loaded");
+        PRINT_D("Fragment shader successfully loaded %s: ", pipelineData.fragmentShaderFile);
     }
 
-    // build the pipeline layout that controls the inputs/outputs of the shader
-    // we are not using descriptor sets or other systems yet, so no need to use anything other than
-    // empty default
-    VkPipelineLayoutCreateInfo pipeline_layout_info = vkinit::pipeline_layout_create_info();
-    VK_CHECK(
-      vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &_trianglePipelineLayout));
+    VkPipelineLayoutCreateInfo graphicsLayout = vkinit::pipeline_layout_create_info();
+    if (pipelineData.descriptorSetLayout) {
+        graphicsLayout.setLayoutCount = 1; // TODO: Should be set according to the number of sets
+        graphicsLayout.pSetLayouts = &pipelineData.descriptorSetLayout;
+    }
+    if (pipelineData.pushConstantRange) {
+        graphicsLayout.pPushConstantRanges = pipelineData.pushConstantRange;
+        graphicsLayout.pushConstantRangeCount = 1;
+    }
+    VK_CHECK(vkCreatePipelineLayout(device, &graphicsLayout, nullptr, &_pipelineLayout));
+
     PipelineBuilder pipelineBuilder;
-    pipelineBuilder._pipelineLayout = _trianglePipelineLayout;
+    pipelineBuilder._pipelineLayout = _pipelineLayout;
 
-    // connecting the vertex and pixel shaders to the pipeline
-    _trianglePipeline = pipelineBuilder.set_shaders(triangleVertexShader, triangleFragShader)
-                          .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-                          .set_polygon_mode(VK_POLYGON_MODE_FILL)
-                          .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE)
-                          .set_multisampling_none()
-                          .disable_blending()
-                          .disable_depthtest()
-                          .set_color_attachment_format(_allocImage.imageFormat)
-                          .set_depth_format(VK_FORMAT_UNDEFINED)
-                          .build_pipeline(device);
+    _pipeline = pipelineBuilder.set_shaders(vertexShader, fragShader)
+                  .set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                  .set_polygon_mode(VK_POLYGON_MODE_FILL)
+                  .set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE)
+                  .set_multisampling_none()
+                  .enable_blending_additive()
+                  // .enable_blending_alphablend()
+                  // .disable_blending()
+                  // .disable_depthtest()
+                  .enable_depthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL)
+                  .set_color_attachment_format(pipelineData.imageFormat)
+                  .set_depth_format(pipelineData.depthFormat)
+                  .build_pipeline(device);
 
-    // use the triangle layout we created
-    // pipelineBuilder._pipelineLayout = _trianglePipelineLayout;
-    // // connecting the vertex and pixel shaders to the pipeline
-    // pipelineBuilder.set_shaders(triangleVertexShader, triangleFragShader);
-    // // it will draw triangles
-    // pipelineBuilder.set_input_topology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    // // filled triangles
-    // pipelineBuilder.set_polygon_mode(VK_POLYGON_MODE_FILL);
-    // // no backface culling
-    // pipelineBuilder.set_cull_mode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-    // // no multisampling
-    // pipelineBuilder.set_multisampling_none();
-    // // no blending
-    // pipelineBuilder.disable_blending();
-    // // no depth testing
-    // pipelineBuilder.disable_depthtest();
-    //
-    // // connect the image format we will draw into, from draw image
-    // pipelineBuilder.set_color_attachment_format(_allocImage.imageFormat);
-    // pipelineBuilder.set_depth_format(VK_FORMAT_UNDEFINED);
-    //
-    // // finally build the pipeline
-    // _trianglePipeline = pipelineBuilder.build_pipeline(device);
-
-    // clean structures
-    vkDestroyShaderModule(device, triangleFragShader, nullptr);
-    vkDestroyShaderModule(device, triangleVertexShader, nullptr);
-
-    // _mainDeletionQueue.push_function([&]() {
-    //     vkDestroyPipelineLayout(device, _trianglePipelineLayout, nullptr);
-    //     vkDestroyPipeline(device, _trianglePipeline, nullptr);
-    // });
+    vkDestroyShaderModule(device, fragShader, nullptr);
+    vkDestroyShaderModule(device, vertexShader, nullptr);
 }
 
-void DotPipeline::bind_descriptor_set(VkCommandBuffer cmd) {
-    vkCmdBindDescriptorSets(cmd,
-                            VK_PIPELINE_BIND_POINT_COMPUTE,
-                            _gradientPipelineLayout,
-                            0,
-                            1,
-                            &_drawImageDescriptors,
-                            0,
-                            nullptr);
-
-    // VkDescriptorSet descriptorSet = _dotPipeline->get_descriptor_set();
-}
-
-void DescriptorLayoutBuilder::add_binding(uint32_t binding, VkDescriptorType type) {
-    VkDescriptorSetLayoutBinding newbind{};
-    newbind.binding = binding;
-    newbind.descriptorCount = 1;
-    newbind.descriptorType = type;
-
-    bindings.push_back(newbind);
-}
-
-void DescriptorLayoutBuilder::clear() {
-    bindings.clear();
-}
-
-VkDescriptorSetLayout DescriptorLayoutBuilder::build(VkDevice device,
-                                                     VkShaderStageFlags shaderStages,
-                                                     void* pNext,
-                                                     VkDescriptorSetLayoutCreateFlags flags) {
-    for (auto& b : bindings) {
-        b.stageFlags |= shaderStages;
-    }
-
-    VkDescriptorSetLayoutCreateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
-    };
-    info.pNext = pNext;
-
-    info.pBindings = bindings.data();
-    info.bindingCount = (uint32_t)bindings.size();
-    info.flags = flags;
-
-    VkDescriptorSetLayout set;
-    VK_CHECK(vkCreateDescriptorSetLayout(device, &info, nullptr, &set));
-    return set;
-}
-
-void DescriptorAllocator::init_pool(VkDevice device,
-                                    uint32_t maxSets,
-                                    std::span<PoolSizeRatio> poolRatios) {
-    std::vector<VkDescriptorPoolSize> poolSizes;
-    for (PoolSizeRatio ratio : poolRatios) {
-        poolSizes.push_back(VkDescriptorPoolSize{
-          .type = ratio.type, .descriptorCount = uint32_t(ratio.ratio * maxSets) });
-    }
-
-    VkDescriptorPoolCreateInfo pool_info = {};
-    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.flags = 0;
-    pool_info.maxSets = maxSets;
-    pool_info.poolSizeCount = (uint32_t)poolSizes.size();
-    pool_info.pPoolSizes = poolSizes.data();
-
-    vkCreateDescriptorPool(device, &pool_info, nullptr, &pool);
-}
-
-void DescriptorAllocator::clear_descriptors(VkDevice device) {
-    vkResetDescriptorPool(device, pool, 0);
-}
-
-void DescriptorAllocator::destroy_pool(VkDevice device) {
-    vkDestroyDescriptorPool(device, pool, nullptr);
-}
-
-VkDescriptorSet DescriptorAllocator::allocate(VkDevice device, VkDescriptorSetLayout layout) {
-    VkDescriptorSetAllocateInfo allocInfo = { .sType =
-                                                VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-    allocInfo.pNext = nullptr;
-    allocInfo.descriptorPool = pool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &layout;
-
-    VkDescriptorSet ds;
-    VK_CHECK(vkAllocateDescriptorSets(device, &allocInfo, &ds));
-
-    return ds;
-}
-
+// BUILDER IMPLEMENTATION
 void DotPipeline::PipelineBuilder::clear() {
     // clear all of the structs we need back to 0 with their correct stype
     _inputAssembly = { .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
@@ -372,18 +183,24 @@ VkPipeline DotPipeline::PipelineBuilder::build_pipeline(VkDevice device) {
     VkPipeline newPipeline;
     if (vkCreateGraphicsPipelines(
           device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &newPipeline) != VK_SUCCESS) {
-        fmt::println("failed to create pipeline");
+        PRINT_D("Failed to create pipeline")
         return VK_NULL_HANDLE; // failed to create graphics pipeline
     } else {
+        // PRINT_D("Pipeline created cool")
         return newPipeline;
     }
 }
 
-DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::set_shaders(
+
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::set_pipeline_layout(VkPipelineLayout layout){
+    _pipelineLayout = layout;
+    return *this;
+}
+
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::set_shaders(
   VkShaderModule vertexShader,
   VkShaderModule fragmentShader) {
     _shaderStages.clear();
-
     _shaderStages.push_back(
       vkinit::pipeline_shader_stage_create_info(VK_SHADER_STAGE_VERTEX_BIT, vertexShader));
 
@@ -392,7 +209,7 @@ DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::set_shaders(
     return *this;
 }
 
-DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::set_input_topology(
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::set_input_topology(
   VkPrimitiveTopology topology) {
     _inputAssembly.topology = topology;
     // we are not going to use primitive restart on the entire tutorial so leave
@@ -401,20 +218,20 @@ DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::set_input_topology(
     return *this;
 }
 
-DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::set_polygon_mode(VkPolygonMode mode) {
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::set_polygon_mode(VkPolygonMode mode) {
     _rasterizer.polygonMode = mode;
     _rasterizer.lineWidth = 1.f;
     return *this;
 }
 
-DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::set_cull_mode(VkCullModeFlags cullMode,
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::set_cull_mode(VkCullModeFlags cullMode,
                                                                          VkFrontFace frontFace) {
     _rasterizer.cullMode = cullMode;
     _rasterizer.frontFace = frontFace;
     return *this;
 }
 
-DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::set_multisampling_none() {
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::set_multisampling_none() {
     _multisampling.sampleShadingEnable = VK_FALSE;
     // multisampling defaulted to no multisampling (1 sample per pixel)
     _multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -426,7 +243,7 @@ DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::set_multisampling_non
     return *this;
 }
 
-DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::disable_blending() {
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::disable_blending() {
     // default write mask
     _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
                                            VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -435,7 +252,33 @@ DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::disable_blending() {
     return *this;
 }
 
-DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::set_color_attachment_format(
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::enable_blending_additive() {
+    _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    _colorBlendAttachment.blendEnable = VK_TRUE;
+    _colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    _colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    _colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    _colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    _colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    _colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    return *this;
+}
+
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::enable_blending_alphablend() {
+    _colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                           VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    _colorBlendAttachment.blendEnable = VK_TRUE;
+    _colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    _colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    _colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    _colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    _colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    _colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    return *this;
+}
+
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::set_color_attachment_format(
   VkFormat format) {
     _colorAttachmentformat = format;
     // connect the format to the renderInfo  structure
@@ -444,15 +287,29 @@ DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::set_color_attachment_
     return *this;
 }
 
-DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::set_depth_format(VkFormat format) {
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::set_depth_format(VkFormat format) {
     _renderInfo.depthAttachmentFormat = format;
     return *this;
 }
 
-DotPipeline::PipelineBuilder DotPipeline::PipelineBuilder::disable_depthtest() {
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::disable_depthtest() {
     _depthStencil.depthTestEnable = VK_FALSE;
     _depthStencil.depthWriteEnable = VK_FALSE;
     _depthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
+    _depthStencil.depthBoundsTestEnable = VK_FALSE;
+    _depthStencil.stencilTestEnable = VK_FALSE;
+    _depthStencil.front = {};
+    _depthStencil.back = {};
+    _depthStencil.minDepthBounds = 0.f;
+    _depthStencil.maxDepthBounds = 1.f;
+    return *this;
+}
+
+DotPipeline::PipelineBuilder& DotPipeline::PipelineBuilder::enable_depthtest(bool depthWriteEnable,
+                                                                            VkCompareOp op) {
+    _depthStencil.depthTestEnable = VK_TRUE;
+    _depthStencil.depthWriteEnable = depthWriteEnable;
+    _depthStencil.depthCompareOp = op;
     _depthStencil.depthBoundsTestEnable = VK_FALSE;
     _depthStencil.stencilTestEnable = VK_FALSE;
     _depthStencil.front = {};

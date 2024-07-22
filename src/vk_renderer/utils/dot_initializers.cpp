@@ -88,6 +88,16 @@ VkCommandBufferSubmitInfo vkinit::command_buffer_submit_info(VkCommandBuffer cmd
 VkSubmitInfo2 vkinit::submit_info(VkCommandBufferSubmitInfo* cmd,
                                   VkSemaphoreSubmitInfo* signalSemaphoreInfo,
                                   VkSemaphoreSubmitInfo* waitSemaphoreInfo) {
+    // VkSubmitInfo2 inf = {
+    //     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+    //     .waitSemaphoreInfoCount = uint32_t(waitSemaphoreInfo == nullptr ? 0 : 1),
+    //     .pWaitSemaphoreInfos = waitSemaphoreInfo,
+    //     .commandBufferInfoCount = 1,
+    //     .pCommandBufferInfos = cmd,
+    //     .signalSemaphoreInfoCount = uint32_t(signalSemaphoreInfo == nullptr ? 0 : 1),
+    //     .pSignalSemaphoreInfos = signalSemaphoreInfo,
+    // };
+
     VkSubmitInfo2 info = {};
     info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
     info.pNext = nullptr;
@@ -304,6 +314,7 @@ VkImageViewCreateInfo vkinit::imageview_create_info(VkFormat format,
     return info;
 }
 //< image_set
+// This is already set to 0 in general
 VkPipelineLayoutCreateInfo vkinit::pipeline_layout_create_info() {
     VkPipelineLayoutCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -325,13 +336,9 @@ VkPipelineShaderStageCreateInfo vkinit::pipeline_shader_stage_create_info(
     VkPipelineShaderStageCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     info.pNext = nullptr;
-
-    // shader stage
-    info.stage = stage;
-    // module containing the code for this shader stage
-    info.module = shaderModule;
-    // the entry point of the shader
-    info.pName = entry;
+    info.stage = stage;         // shader stage
+    info.module = shaderModule; // module containing the code for this shader stage
+    info.pName = entry;         // the entry point of the shader
     return info;
 }
 

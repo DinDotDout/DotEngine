@@ -1,8 +1,5 @@
 #include "dot_window.hpp"
-
 #include "SDL.h"
-#include "dot_engine.hpp"
-// #include <SDL_vulkan.h>
 
 namespace dt {
 

@@ -1,5 +1,4 @@
 #pragma once
-#include <dot_window.hpp>
 #include "VkBootstrap.h"
 namespace dt {
 
@@ -11,6 +10,7 @@ public:
     DotDevice& operator=(const DotDevice&) = delete;
     ~DotDevice();
 
+
     // VkInstance get_instance() const { return _instance; }
     VkPhysicalDevice get_gpu() const { return _physicalDevice; }
     VkDevice get_device() const { return _device; }
@@ -18,7 +18,6 @@ public:
     uint32_t get_graphics_queue_family() const { return _graphicsQueueFamily; }
 
   private:
-
     VkDevice _device;
     VkPhysicalDevice _physicalDevice;
     VkQueue _graphicsQueue;
