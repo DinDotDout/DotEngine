@@ -25,7 +25,7 @@
 namespace dt{
 struct DrawContext;
 class IRenderable {
-    virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) = 0;
+    virtual void draw(const glm::mat4& topMatrix, DrawContext& ctx) = 0;
 };
 
 struct Node : public IRenderable {
@@ -43,10 +43,10 @@ struct Node : public IRenderable {
         }
     }
 
-    virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) {
+    virtual void draw(const glm::mat4& topMatrix, DrawContext& ctx) {
         // draw children
         for (auto& c : children) {
-            c->Draw(topMatrix, ctx);
+            c->draw(topMatrix, ctx);
         }
     }
 };
@@ -95,7 +95,7 @@ struct GPUDrawPushConstants {
 };
 
 #ifdef NDEBUG
-#define VK_CHECK(x)
+#define VK_CHECK(x) x
 #define PRINT_D(message, ...)
 #else
 #define VK_CHECK(x)                                                                                \
@@ -106,7 +106,6 @@ struct GPUDrawPushConstants {
             abort();                                                                               \
         }                                                                                          \
     } while (0)
-#define PRINT_D(message, ...) printf(message "\n", ##__VA_ARGS__);
+#define PRINT_D(message, ...) fmt::println(message, ##__VA_ARGS__);
 #endif
-
 }
