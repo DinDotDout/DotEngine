@@ -1,7 +1,7 @@
 #pragma once
 
-#include "vk_renderer/vk_types.hpp"
 #include <vulkan/vulkan.h>
+#include "vk_renderer/vk_types.hpp"
 
 // NOTE: Image builder class?
 namespace dt {
@@ -32,4 +32,5 @@ AllocatedImage create_image(VmaAllocator allocator,
                             bool mipmapped = false);
 
 void destroy_image(VmaAllocator allocator, VkDevice device, const AllocatedImage& img);
+void generate_mipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imageSize);
 } // namespace dt

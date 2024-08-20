@@ -21,9 +21,7 @@ DotPipeline::DotPipeline(std::variant<GraphicsPipelineConfig, ComputePipelineCon
 }
 
 DotPipeline::~DotPipeline() {
-    std::cout << "Destroying pipeline" << std::endl;
     vkDestroyPipelineLayout(_device.get_device(), _pipelineLayout, nullptr);
-    std::cout << "Destroying pileineLayout" << std::endl;
     vkDestroyPipeline(_device.get_device(), _pipeline, nullptr);
 }
 
@@ -41,10 +39,10 @@ void DotPipeline::_init_compute_pipeline(ComputePipelineConfig pipelineData) {
 
     VkShaderModule computeShader;
     if (!vkinit::load_shader_module(pipelineData.computeShaderFile, device, &computeShader)) {
-        PRINT_D("Error when building the compute shader %s: ", pipelineData.computeShaderFile);
+        PRINT_D("Error when building the compute shader {}: ", pipelineData.computeShaderFile);
         // fmt::println("Error when building the compute shader");
     } else {
-        PRINT_D("Compute shader successfully loaded %s: ", pipelineData.computeShaderFile);
+        PRINT_D("Compute shader successfully loaded {}: ", pipelineData.computeShaderFile);
         // fmt::println("Compute shader successfully loaded");
     }
 
@@ -65,16 +63,16 @@ void DotPipeline::_init_graphics_pipeline(GraphicsPipelineConfig pipelineData) {
     VkDevice device = _device.get_device();
     VkShaderModule vertexShader;
     if (!vkinit::load_shader_module(pipelineData.vertexShaderFile, device, &vertexShader)) {
-        PRINT_D("Error when building the fragment shader %s: ", pipelineData.vertexShaderFile);
+        PRINT_D("Error when building the fragment shader {}: ", pipelineData.vertexShaderFile);
     } else {
-        PRINT_D("Vertex shader successfully loaded %s: ", pipelineData.vertexShaderFile);
+        PRINT_D("Vertex shader successfully loaded {}: ", pipelineData.vertexShaderFile);
     }
 
     VkShaderModule fragShader;
     if (!vkinit::load_shader_module(pipelineData.fragmentShaderFile, device, &fragShader)) {
-        PRINT_D("Error when building the fragment shader %s: ", pipelineData.fragmentShaderFile);
+        PRINT_D("Error when building the fragment shader {}: ", pipelineData.fragmentShaderFile);
     } else {
-        PRINT_D("Fragment shader successfully loaded %s: ", pipelineData.fragmentShaderFile);
+        PRINT_D("Fragment shader successfully loaded {}: ", pipelineData.fragmentShaderFile);
     }
 
     VkPipelineLayoutCreateInfo graphicsLayout = vkinit::pipeline_layout_create_info();

@@ -9,6 +9,10 @@ add_executable(engine ${SOURCES})
 
 set_property(TARGET engine PROPERTY CXX_STANDARD 20)
 target_compile_definitions(engine PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
+
+# file(GLOB_RECURSE INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/*")
+# target_include_directories(engine PUBLIC ${INCLUDE_DIRS})
+
 target_include_directories(engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # Ensure the required package is found

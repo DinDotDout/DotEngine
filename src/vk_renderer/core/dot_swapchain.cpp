@@ -196,10 +196,9 @@ bool DotSwapchain::swapchain_present_image(VkQueue queue) {
     VkResult result = vkQueuePresentKHR(queue, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         resize_swapchain(_dotWindow.get_window_extent());
-        PRINT_D("resizing");
+        PRINT_D("Resizing swapchain");
         return false;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-        PRINT_D("throwing");
         throw std::runtime_error("Failed to acquire next swapchain image!");
     }
     _frame++;
@@ -208,8 +207,6 @@ bool DotSwapchain::swapchain_present_image(VkQueue queue) {
 
 void DotSwapchain::submit_command_buffer(VkCommandBuffer cmd) {
     FrameData& frameData = get_current_frame_data();
-    VkImage currentImage = _swapchainImages[_swapchainImageIndex];
-
     VkCommandBufferSubmitInfo cmdinfo = vkinit::command_buffer_submit_info(cmd);
 
     VkSemaphoreSubmitInfo waitInfo = vkinit::semaphore_submit_info(

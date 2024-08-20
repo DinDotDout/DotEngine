@@ -10,6 +10,8 @@ public:
     // horizontal rotation
     float yaw { 0.f };
 
+    float free_mouse = false;
+
     glm::mat4 getViewMatrix();
     glm::mat4 getRotationMatrix();
 

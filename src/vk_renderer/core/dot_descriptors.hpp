@@ -5,6 +5,9 @@
 #include <deque>
 #include <span>
 #include <vulkan/vulkan_core.h>
+
+// #include <dot_device.hpp>
+
 namespace dt {
 struct DescriptorWriter {
     std::deque<VkDescriptorImageInfo> imageInfos;

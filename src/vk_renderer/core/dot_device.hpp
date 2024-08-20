@@ -4,7 +4,6 @@ namespace dt {
 
 class DotDevice {
 public:
-
     explicit DotDevice(vkb::Instance& instance, VkSurfaceKHR& surface);
     DotDevice(const DotDevice&) = delete;
     DotDevice& operator=(const DotDevice&) = delete;

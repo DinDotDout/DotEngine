@@ -16,7 +16,6 @@ DotWindow::DotWindow(uint32_t w, uint32_t h, std::string name)
                                window_flags);
 }
 
-
 void DotWindow::update_extent() {
     int w, h;
     SDL_GetWindowSize(_window, &w, &h);
@@ -35,6 +34,12 @@ void DotWindow::handle_window_events(const SDL_Event& event) {
             break;
         case SDL_WINDOWEVENT_RESTORED:
             _minimized = false;
+            break;
+        case SDL_WINDOWEVENT_ENTER:
+            _has_focus = true;
+            break;
+        case SDL_WINDOWEVENT_LEAVE:
+            _has_focus = false;
             break;
     }
 }

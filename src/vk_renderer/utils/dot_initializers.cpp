@@ -1,7 +1,6 @@
 ﻿#include "vk_renderer/utils/dot_initializers.hpp"
 // NOTE: Will probably need structures for many of those and will need separation.
 
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 //> init_cmd

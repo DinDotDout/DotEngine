@@ -13,6 +13,7 @@ class DotWindow {
     const VkExtent2D& get_window_extent() const { return _windowExtent; }
     bool is_minimized() const { return _minimized; }
     bool is_resize_requested() const { return _window_resized; }
+    bool has_focus() const { return _has_focus; }
     void reset_resized() { _window_resized = false; }
 
     void update_extent();
@@ -22,6 +23,7 @@ class DotWindow {
   private:
     bool _minimized{ false };
     bool _window_resized{ false };
+    bool _has_focus{ false };
 
     const SDL_WindowFlags window_flags =
       (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);

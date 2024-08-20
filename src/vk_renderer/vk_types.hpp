@@ -68,9 +68,6 @@ struct AllocatedBuffer {
     VmaAllocationInfo info;
 };
 
-// class IRenderable {
-//     virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) = 0;
-// };
 
 // TODO: Change to struct of arrays.
 struct Vertex {

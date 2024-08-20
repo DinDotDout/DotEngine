@@ -11,6 +11,10 @@ void Camera::update() {
 // TODO: Bind movement to delta time.
 void Camera::processSDLEvent(SDL_Event& e) {
     if (e.type == SDL_KEYDOWN) {
+        if (e.key.keysym.sym == SDLK_LCTRL) {
+            free_mouse = true;
+            SDL_SetRelativeMouseMode(SDL_FALSE);
+        }
         if (e.key.keysym.sym == SDLK_w) {
             velocity.z = -1;
         }
@@ -38,8 +42,13 @@ void Camera::processSDLEvent(SDL_Event& e) {
         if (e.key.keysym.sym == SDLK_d) {
             velocity.x = 0;
         }
+        if (e.key.keysym.sym == SDLK_LCTRL) {
+            free_mouse = false;
+            SDL_SetRelativeMouseMode(SDL_TRUE);
+        }
     }
 
+    if (free_mouse) return;
     if (e.type == SDL_MOUSEMOTION) {
         yaw += (float)e.motion.xrel / 200.f;
         pitch -= (float)e.motion.yrel / 200.f;

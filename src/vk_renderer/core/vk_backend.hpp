@@ -1,15 +1,24 @@
 #pragma once
-#include "VkBootstrap.h"
 #include "memory"
 
+#include "VkBootstrap.h"
+
+#include <vk_renderer/core/dot_descriptors.hpp>
+#include <vk_renderer/vk_types.hpp>
+
+// utils
 #include "vk_renderer/utils/deletion_queue.hpp"
 #include "vk_renderer/utils/dot_loader.hpp"
-#include <vk_renderer/core/dot_descriptors.hpp>
 #include <vk_renderer/utils/dot_images.hpp>
-#include <vk_renderer/vk_types.hpp>
-// #include "vk_renderer/utils/dot_images.hpp"
 
 namespace dt {
+
+struct VulkanStats{
+    int triangleCount;
+    int drawcallCount;
+    float sceneUpdateTime;
+    float meshDrawTime;
+};
 
 struct RenderObject {
     uint32_t indexCount;
@@ -17,18 +26,21 @@ struct RenderObject {
     VkBuffer indexBuffer;
 
     MaterialInstance* material;
-
+    Bounds bounds;
     glm::mat4 transform;
     VkDeviceAddress vertexBufferAddress;
 };
 
+bool is_visible(const RenderObject& obj, const glm::mat4& viewproj);
+
 struct DrawContext {
     std::vector<RenderObject> OpaqueSurfaces;
+    std::vector<RenderObject> TransparentSurfaces;
 };
 
 struct MeshNode : public Node {
     std::shared_ptr<MeshAsset> mesh;
-    virtual void Draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
+    virtual void draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
 };
 
 struct GLTFMetallic_Roughness {
@@ -98,7 +110,6 @@ class VkBackend {
 
     explicit VkBackend(DotWindow& dotWindow);
     ~VkBackend();
-
     VkBackend(const VkBackend&) = delete;
     VkBackend& operator=(const VkBackend&) = delete;
 
@@ -106,28 +117,42 @@ class VkBackend {
     void update_scene(glm::mat4 view, glm::mat4 projection);
     void resize_swapchain();
     void wait_device_idle();
-    const std::vector<ComputeEffect>& get_background_effects() const { return _computeEffects; };
+    void write_texture_data(void* data, const AllocatedImage& image, bool mipmapped = false);
+    GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
+    // engine defaults
+    VulkanStats stats;
+    AllocatedImage _whiteImage;
+    AllocatedImage _blackImage;
+    AllocatedImage _greyImage;
+    AllocatedImage _errorCheckerboardImage;
+    VkSampler _defaultSamplerLinear;
+    VkSampler _defaultSamplerNearest;
+    GLTFMetallic_Roughness metalRoughMaterial;
+
+    std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
+
+    // getters
+    const std::vector<ComputeEffect>& get_background_effects() const { return _computeEffects; };
     VkDescriptorSetLayout& get_descriptor_layout() { return _gpuSceneDataDescriptorLayout; };
     int get_current_background_effect() const { return _currentBackgroundEffect; };
     float get_render_scale() const { return _renderScale; };
-
     DotDevice& get_device() { return *_dotDevice; };
+    VmaAllocator& get_vma_allocator() { return _allocator; };
     AllocatedImage& get_draw_image() { return _drawImage; };
     AllocatedImage& get_depth_image() { return _depthImage; };
 
+    // setters
     void set_current_background_effect(int backgroundEffect) {
         _currentBackgroundEffect = backgroundEffect;
     }
     void set_render_scale(float renderScale) { _renderScale = renderScale; }
 
-    GPUMeshBuffers upload_mesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
   private:
     DrawContext mainDrawContext;
     std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
     MaterialInstance defaultData;
-    GLTFMetallic_Roughness metalRoughMaterial;
 
     uint32_t _frame = 0;
     DotWindow& _dotWindow;
@@ -141,46 +166,30 @@ class VkBackend {
     VkDebugUtilsMessengerEXT _debugMessenger;
     VkSurfaceKHR _surface{};
     VkInstance _instance{};
-
     std::unique_ptr<DotDevice> _dotDevice;
     std::unique_ptr<DotSwapchain> _dotSwapchain;
     std::unique_ptr<DotImGui> _dotImGui;
-
     DescriptorAllocatorGrowable globalDescriptorAllocator;
     VkDescriptorSet
       _drawImageDescriptors; // Descriptor set for the image this is going to work onto
     VkDescriptorSetLayout _drawImageDescriptorLayout;
-
     // NOTE: Should not be embedded. Maybe keep some default pipeline around.
     int _currentBackgroundEffect{ 0 };
     std::vector<ComputeEffect> _computeEffects;
     std::unique_ptr<DotPipeline> _trianglePipeline;
-
     std::unique_ptr<DotPipeline>
       _meshPipeline; // NOTE: Bind pipeline with multiple meshes or some other thing.
     GPUMeshBuffers rectangle;
     std::vector<std::shared_ptr<MeshAsset>> testMeshes;
-
     GPUSceneData sceneData;
     VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
     VkDescriptorSetLayout _singleImageDescriptorLayout;
-
     DeletionQueue _deletionQueue{};
     VmaAllocator _allocator;
     AllocatedImage _drawImage;
     AllocatedImage _depthImage;
     VkExtent2D _drawExtent;
     float _renderScale = 1.0f;
-
-
-    // <engine defaults
-    AllocatedImage _whiteImage;
-    AllocatedImage _blackImage;
-    AllocatedImage _greyImage;
-    AllocatedImage _errorCheckerboardImage;
-    VkSampler _defaultSamplerLinear;
-    VkSampler _defaultSamplerNearest;
-    // </engine defaults
 
     void _init_vulkan();
     vkb::Instance _create_instance();
@@ -193,6 +202,7 @@ class VkBackend {
     void _init_pipelines();
     void _init_imgui();
     void _init_default_data();
+    void _init_renderables();
 
     // void draw(VkCommandBuffer cmd, VkImage* im);
     void draw_background(VkCommandBuffer cmd);
@@ -202,15 +212,6 @@ class VkBackend {
     // void bind_descriptor_set(VkCommandBuffer cmd);
     void _end_command_buffer(VkCommandBuffer cmd);
     void _begin_command_buffer(VkCommandBuffer cmd);
-
-    void write_texture_data(void* data, const AllocatedImage& image);
-    // AllocatedImage create_image(VmaAllocator allocator,
-    //                             void* data,
-    //                             VkExtent3D size,
-    //                             VkFormat format,
-    //                             VkDevice device,
-    //                             VkImageUsageFlags usage,
-    //                             bool mipmapped = false);
 };
 
 } // namespace dt
